@@ -81,11 +81,16 @@ app.post('/api/auth/login', async (req, res) => {
 
     if (error) throw error;
 
-    const { data: user } = await supabase
+    // Récupère l'utilisateur de la DB
+    const { data: user, error: userError } = await supabase
       .from('utilisateurs')
       .select('id, email, nom, role')
       .eq('id', data.user.id)
       .single();
+
+    if (!user) {
+      throw new Error('Utilisateur non trouvé dans la base de données. Contactez l\'admin.');
+    }
 
     const token = jwt.sign(
       { id: user.id, email: user.email },
