@@ -7,7 +7,6 @@ const express = require('express');
 const cors = require('cors');
 const { createClient } = require('@supabase/supabase-js');
 const jwt = require('jsonwebtoken');
-
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -73,7 +72,6 @@ const adminOrMaster = (req, res, next) => {
 app.post('/api/admin/create-master', async (req, res) => {
   const { email, nom, password } = req.body;
 
-  // Vérification basique
   if (!email || !nom || !password) {
     return res.status(400).json({ error: 'Email, nom et mot de passe requis' });
   }
@@ -83,19 +81,25 @@ app.post('/api/admin/create-master', async (req, res) => {
   }
 
   try {
+    // Utiliser SERVICE_ROLE_KEY pour contourner RLS
+    const supabaseAdmin = createClient(
+      process.env.SUPABASE_URL,
+      process.env.SUPABASE_SERVICE_KEY
+    );
+
     // 1. Vérifier s'il existe déjà un master
-    const { data: existingMaster } = await supabase
+    const { data: existingMaster } = await supabaseAdmin
       .from('utilisateurs')
       .select('id')
       .eq('role', 'master')
-      .single();
+      .maybeSingle();
 
     if (existingMaster) {
-      return res.status(403).json({ error: 'Un master existe déjà. Cette opération ne peut être effectuée qu\'une fois.' });
+      return res.status(403).json({ error: 'Un master existe déjà.' });
     }
 
-    // 2. Créer utilisateur Supabase Auth
-    const { data: authUser, error: authError } = await supabase.auth.admin.createUser({
+    // 2. Créer user Supabase Auth
+    const { data: authUser, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email,
       password,
       email_confirm: true
@@ -103,8 +107,8 @@ app.post('/api/admin/create-master', async (req, res) => {
 
     if (authError) throw authError;
 
-    // 3. Insérer dans DB avec rôle master
-    const { data, error } = await supabase
+    // 3. Insérer dans DB
+    const { data, error } = await supabaseAdmin
       .from('utilisateurs')
       .insert({
         id: authUser.user.id,
@@ -123,6 +127,7 @@ app.post('/api/admin/create-master', async (req, res) => {
       user: data[0]
     });
   } catch (error) {
+    console.error('Error creating master:', error);
     res.status(400).json({ error: error.message });
   }
 });
