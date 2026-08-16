@@ -67,6 +67,67 @@ const adminOrMaster = (req, res, next) => {
 };
 
 // ============================================
+// ROUTES ADMIN SETUP (Initialisation)
+// ============================================
+
+app.post('/api/admin/create-master', async (req, res) => {
+  const { email, nom, password } = req.body;
+
+  // Vérification basique
+  if (!email || !nom || !password) {
+    return res.status(400).json({ error: 'Email, nom et mot de passe requis' });
+  }
+
+  if (password.length < 12) {
+    return res.status(400).json({ error: 'Mot de passe minimum 12 caractères' });
+  }
+
+  try {
+    // 1. Vérifier s'il existe déjà un master
+    const { data: existingMaster } = await supabase
+      .from('utilisateurs')
+      .select('id')
+      .eq('role', 'master')
+      .single();
+
+    if (existingMaster) {
+      return res.status(403).json({ error: 'Un master existe déjà. Cette opération ne peut être effectuée qu\'une fois.' });
+    }
+
+    // 2. Créer utilisateur Supabase Auth
+    const { data: authUser, error: authError } = await supabase.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true
+    });
+
+    if (authError) throw authError;
+
+    // 3. Insérer dans DB avec rôle master
+    const { data, error } = await supabase
+      .from('utilisateurs')
+      .insert({
+        id: authUser.user.id,
+        email,
+        nom,
+        role: 'master',
+        departement: 'Admin',
+        created_by: authUser.user.id
+      })
+      .select();
+
+    if (error) throw error;
+
+    res.status(201).json({ 
+      message: 'Master créé avec succès',
+      user: data[0]
+    });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// ============================================
 // ROUTES AUTH (Login)
 // ============================================
 
@@ -81,16 +142,11 @@ app.post('/api/auth/login', async (req, res) => {
 
     if (error) throw error;
 
-    // Récupère l'utilisateur de la DB
-    const { data: user, error: userError } = await supabase
+    const { data: user } = await supabase
       .from('utilisateurs')
       .select('id, email, nom, role')
       .eq('id', data.user.id)
       .single();
-
-    if (!user) {
-      throw new Error('Utilisateur non trouvé dans la base de données. Contactez l\'admin.');
-    }
 
     const token = jwt.sign(
       { id: user.id, email: user.email },
@@ -379,25 +435,33 @@ app.post('/api/heures', authMiddleware, async (req, res) => {
 });
 
 // ============================================
-// HEALTH CHECK
-// ============================================
-
-app.get('/health', (req, res) => {
-  res.json({ status: 'OK', timestamp: new Date().toISOString() });
-});
-
-// ============================================
 // SERVIR FRONTEND STATIQUE
 // ============================================
 
 app.use(express.static(__dirname));
 
-app.get('/portail', (req, res) => {
+app.get('/setup', (req, res) => {
+  res.sendFile(__dirname + '/setup.html');
+});
+
+app.get('/login', (req, res) => {
+  res.sendFile(__dirname + '/login.html');
+});
+
+app.get('/portail-cadexair-frontend.html', (req, res) => {
   res.sendFile(__dirname + '/portail-cadexair-frontend.html');
 });
 
 app.get('/', (req, res) => {
   res.sendFile(__dirname + '/portail-cadexair-frontend.html');
+});
+
+// ============================================
+// HEALTH CHECK
+// ============================================
+
+app.get('/health', (req, res) => {
+  res.json({ status: 'OK', timestamp: new Date().toISOString() });
 });
 
 // ============================================
