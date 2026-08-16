@@ -382,6 +382,20 @@ app.get('/health', (req, res) => {
 });
 
 // ============================================
+// SERVIR FRONTEND STATIQUE
+// ============================================
+
+app.use(express.static(__dirname));
+
+app.get('/portail', (req, res) => {
+  res.sendFile(__dirname + '/portail-cadexair-frontend.html');
+});
+
+app.get('/', (req, res) => {
+  res.sendFile(__dirname + '/portail-cadexair-frontend.html');
+});
+
+// ============================================
 // START SERVER
 // ============================================
 
