@@ -81,13 +81,11 @@ app.post('/api/admin/create-master', async (req, res) => {
   }
 
   try {
-    // Utiliser SERVICE_ROLE_KEY pour contourner RLS
     const supabaseAdmin = createClient(
       process.env.SUPABASE_URL,
       process.env.SUPABASE_SERVICE_KEY
     );
 
-    // 1. Vérifier s'il existe déjà un master
     const { data: existingMaster } = await supabaseAdmin
       .from('utilisateurs')
       .select('id')
@@ -98,7 +96,6 @@ app.post('/api/admin/create-master', async (req, res) => {
       return res.status(403).json({ error: 'Un master existe déjà.' });
     }
 
-    // 2. Créer user Supabase Auth
     const { data: authUser, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email,
       password,
@@ -107,7 +104,6 @@ app.post('/api/admin/create-master', async (req, res) => {
 
     if (authError) throw authError;
 
-    // 3. Insérer dans DB
     const { data, error } = await supabaseAdmin
       .from('utilisateurs')
       .insert({
